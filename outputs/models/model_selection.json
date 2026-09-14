@@ -1,0 +1,7 @@
+{
+  "status": "pending_missing_valid_targets",
+  "best_model": null,
+  "reason": "Model comparison is pending until an authoritative hazard target contains observed labels.",
+  "trained_models": [],
+  "metrics": []
+}

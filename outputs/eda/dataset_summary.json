@@ -1,0 +1,201 @@
+{
+  "rows": 915,
+  "columns": 19,
+  "column_names": [
+    "cell_id",
+    "region",
+    "latitude",
+    "longitude",
+    "observation_period",
+    "rain_3h",
+    "rain_24h",
+    "rain_3d",
+    "rain_7d",
+    "elevation",
+    "slope",
+    "aspect",
+    "NDVI",
+    "NDWI",
+    "distance_to_river_km",
+    "distance_to_road_km",
+    "population_density",
+    "flood",
+    "landslide"
+  ],
+  "regions": {
+    "Assam": 717,
+    "Meghalaya": 198
+  },
+  "numeric_summary": {
+    "latitude": {
+      "count": 915.0,
+      "mean": 26.188251,
+      "std": 0.773099,
+      "min": 24.15,
+      "25%": 25.65,
+      "50%": 26.15,
+      "75%": 26.75,
+      "max": 27.95
+    },
+    "longitude": {
+      "count": 915.0,
+      "mean": 92.509016,
+      "std": 1.538077,
+      "min": 89.75,
+      "25%": 91.25,
+      "50%": 92.55,
+      "75%": 93.55,
+      "max": 95.95
+    },
+    "observation_period": {
+      "count": 0.0,
+      "mean": null,
+      "std": null,
+      "min": null,
+      "25%": null,
+      "50%": null,
+      "75%": null,
+      "max": null
+    },
+    "rain_3h": {
+      "count": 0.0,
+      "mean": null,
+      "std": null,
+      "min": null,
+      "25%": null,
+      "50%": null,
+      "75%": null,
+      "max": null
+    },
+    "rain_24h": {
+      "count": 0.0,
+      "mean": null,
+      "std": null,
+      "min": null,
+      "25%": null,
+      "50%": null,
+      "75%": null,
+      "max": null
+    },
+    "rain_3d": {
+      "count": 0.0,
+      "mean": null,
+      "std": null,
+      "min": null,
+      "25%": null,
+      "50%": null,
+      "75%": null,
+      "max": null
+    },
+    "rain_7d": {
+      "count": 0.0,
+      "mean": null,
+      "std": null,
+      "min": null,
+      "25%": null,
+      "50%": null,
+      "75%": null,
+      "max": null
+    },
+    "elevation": {
+      "count": 0.0,
+      "mean": null,
+      "std": null,
+      "min": null,
+      "25%": null,
+      "50%": null,
+      "75%": null,
+      "max": null
+    },
+    "slope": {
+      "count": 0.0,
+      "mean": null,
+      "std": null,
+      "min": null,
+      "25%": null,
+      "50%": null,
+      "75%": null,
+      "max": null
+    },
+    "aspect": {
+      "count": 0.0,
+      "mean": null,
+      "std": null,
+      "min": null,
+      "25%": null,
+      "50%": null,
+      "75%": null,
+      "max": null
+    },
+    "NDVI": {
+      "count": 0.0,
+      "mean": null,
+      "std": null,
+      "min": null,
+      "25%": null,
+      "50%": null,
+      "75%": null,
+      "max": null
+    },
+    "NDWI": {
+      "count": 0.0,
+      "mean": null,
+      "std": null,
+      "min": null,
+      "25%": null,
+      "50%": null,
+      "75%": null,
+      "max": null
+    },
+    "distance_to_river_km": {
+      "count": 0.0,
+      "mean": null,
+      "std": null,
+      "min": null,
+      "25%": null,
+      "50%": null,
+      "75%": null,
+      "max": null
+    },
+    "distance_to_road_km": {
+      "count": 0.0,
+      "mean": null,
+      "std": null,
+      "min": null,
+      "25%": null,
+      "50%": null,
+      "75%": null,
+      "max": null
+    },
+    "population_density": {
+      "count": 0.0,
+      "mean": null,
+      "std": null,
+      "min": null,
+      "25%": null,
+      "50%": null,
+      "75%": null,
+      "max": null
+    },
+    "flood": {
+      "count": 0.0,
+      "mean": null,
+      "std": null,
+      "min": null,
+      "25%": null,
+      "50%": null,
+      "75%": null,
+      "max": null
+    },
+    "landslide": {
+      "count": 0.0,
+      "mean": null,
+      "std": null,
+      "min": null,
+      "25%": null,
+      "50%": null,
+      "75%": null,
+      "max": null
+    }
+  }
+}

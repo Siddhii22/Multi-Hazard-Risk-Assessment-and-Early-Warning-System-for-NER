@@ -1,0 +1,7 @@
+# Initial Python/data workflow only. Add project-specific dependencies after they are approved.
+numpy
+pandas
+jupyterlab
+matplotlib
+seaborn
+geopandas

@@ -1,0 +1,16 @@
+# Project paths are relative to the repository root.
+[paths]
+raw_data = "data/raw"
+interim_data = "data/interim"
+processed_data = "data/processed"
+dataset_manifest = "config/dataset_manifest.json"
+
+[study_region]
+states = ["Assam", "Meghalaya"]
+grid_description = "Approximately 0.1-degree (~10 km) common MSE-1 modelling grid"
+cell_identifier = "cell_id"
+coordinate_fields = ["latitude", "longitude"]
+
+[ingestion]
+# Dataset-specific file formats, schemas, and aggregation methods remain pending source metadata inspection.
+manifest_status = "template_only"

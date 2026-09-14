@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Virtual environments and environment files
+.venv/
+venv/
+env/
+ENV/
+.env
+.env.*
+
+# Data and generated artefacts
+/data/raw/*
+!/data/raw/.gitkeep
+/data/interim/*
+!/data/interim/.gitkeep
+/data/processed/*
+!/data/processed/.gitkeep
+*.sqlite
+*.gpkg
+*.geojson
+*.shp
+*.shx
+*.dbf
+*.prj
+*.cpg
+*.tif
+*.tiff
+*.nc
+*.csv
+*.parquet
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDEs and OS files
+.vscode/
+.idea/
+*.code-workspace
+.DS_Store
+Thumbs.db
