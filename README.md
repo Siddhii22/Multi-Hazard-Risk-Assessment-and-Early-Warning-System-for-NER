@@ -1,41 +1,37 @@
-# AI and GIS-Based Multi-Hazard Risk Assessment and Early-Warning System for North-East India
+# Multi-Hazard Risk Assessment and Early-Warning System
 
-## Project overview
+## Problem and scope
 
-This college project will develop an AI- and GIS-supported system to assess and communicate multi-hazard risk in Assam and Meghalaya. The system will keep hazard likelihood, rainfall severity, and population exposure distinct before combining them later in a documented risk engine.
+This project develops a GIS- and AI-based environmental intelligence system for Assam and Meghalaya within the wider North-East India context. It integrates daily rainfall, terrain, hydrology, land-surface, soil, infrastructure, and socioeconomic exposure variables to support spatial hazard assessment and future early-warning decisions.
 
-## Problem and study region
+The current MSE-1 scope is dataset audit, reproducible preprocessing, exploratory analysis, model identification, and an interactive dashboard. It does not claim operational warnings, trained final models, or final multi-hazard risk scores.
 
-Assam and Meghalaya are exposed to extreme rainfall, flood / flash flood, and landslide hazards. The project will create two initial prediction tasks—flood likelihood and landslide likelihood—on a common modelling grid, then later combine their outputs with rainfall severity and exposure information for multi-hazard risk communication.
+## Dataset and objectives
 
-## MSE-1 data design
+`data/master_dataset_FINAL_v4.csv` is the authoritative, immutable input: 522,522 daily observations, 693 spatial cells, 25 columns, and coverage from 2021-01-08 to 2023-12-14. The primary supervised target is `flood_label` with 311 positive observations. `landslide_label_static` is treated as a spatial susceptibility component; `landslide_label_daily` has only six positives and is not used as a daily classifier target.
 
-- **Spatial unit:** an approximately 0.1-degree (~10 km) common grid, chosen for the prototype because GPM IMERG is approximately 0.1 degree. Each cell will have a stable `cell_id` and retained latitude/longitude. Resampling rainfall to a finer grid will never be represented as finer rainfall information.
-- **Temporal unit:** event-based observations rather than a forced daily master table. Event dates or periods will be retained only when supplied by the source.
-- **Rainfall windows:** `rain_3h`, `rain_24h`, `rain_3d`, and `rain_7d`, calculated immediately before the relevant event/observation period when the source supports it.
-- **Initial predictors:** rainfall windows, elevation, slope, aspect, NDVI, NDWI, distance to river, distance to road, and population density.
-- **Candidate models:** Logistic Regression baseline, Random Forest primary candidate, and XGBoost tabular comparison for both prediction tasks. No model has been trained.
+Objectives are to integrate heterogeneous variables, build reproducible preprocessing, analyse spatial and temporal patterns, prepare flood and susceptibility components, establish exposure-aware architecture, and provide interactive visual analysis for MSE-1 evaluation.
 
-## Target definitions
+## Pipeline
 
-- **Flood target:** binary flood occurrence. `flood = 1` when a grid cell is associated with an observed flood/inundation event in the selected authoritative source and its available spatial/temporal information.
-- **Landslide target:** binary landslide occurrence. `landslide = 1` when a grid cell is associated with an observed landslide event in the selected authoritative inventory and its available spatial/temporal information.
-- A missing record is not automatically a negative label. Negative-sample construction remains open until the selected sources are inspected.
-- Extreme rainfall is initially a predictor and later a trigger/risk-engine component, not a separate supervised ML target.
+1. `python -m src.data_audit`
+2. `python -m src.preprocessing.pipeline`
+3. `python -m src.eda.report`
+4. `python -m src.model_identification`
 
-## Planned pipeline
+The raw CSV is never overwritten. Preprocessing creates rainfall 3-day/7-day and previous-window features, circular aspect transforms, temporal fields, and sparse-feature availability indicators. Model imputers and encoders must be fitted on training data only.
 
-1. Inspect candidate sources and record their metadata, coverage, and suitability.
-2. Ingest sources at native resolution and construct documented grid-level features.
-3. Build event-linked flood and landslide labels, including an explicit negative-sample design.
-4. Perform EDA and select appropriate preprocessing.
-5. Train, tune, and evaluate flood- and landslide-likelihood models using leakage-aware validation.
-6. At ESE, combine flood probability, landslide probability, rainfall severity, and population/exposure into a composite multi-hazard risk score.
-7. Produce GIS risk maps, red-zone identification, early-warning logic, and an interactive dashboard.
+## Model identification
 
-## Validation and spatial policy
+Candidate models are Logistic Regression, Random Forest, and XGBoost. MSE-2 will use temporal and/or spatially aware validation, then report precision, recall, F1, PR-AUC, ROC-AUC, confusion matrices, and false-negative analysis. No model results are fabricated in MSE-1.
 
-Validation will not use a naive random split without considering spatial and temporal dependence. The eventual strategy will preserve temporal ordering where appropriate, apply spatial holdout/separation where feasible, and retain an untouched final test set. Future rainfall must never be used to predict a historical event, and preprocessing transformations must be fitted on training data only.
+## Dashboard
+
+Run from the repository root: `streamlit run dashboard/app.py`. Pages cover overview, study region, data and sources, preparation, interactive EDA, hazard intelligence, AI model lab, spatial intelligence, and an explicitly non-operational early-warning architecture.
+
+## Future stages and limitations
+
+MSE-2 adds training, tuning, spatial-temporal evaluation, explainability, and error analysis. ESE adds validated outputs, documented exposure/vulnerability combination, stakeholder-reviewed warning logic, and deployment. Current limitations include extreme flood imbalance, sparse daily landslide labels, missing socioeconomic coverage, and no validated operational warning threshold.
 
 Spatial operations such as distance and area calculations will use appropriate CRS transformations. Source data will remain at native resolution during ingestion and be aggregated/intersected to the common grid during feature construction, with every aggregation method documented. CRS will not be mixed silently, and aggregation will not be described as creating information finer than a source dataset.
 

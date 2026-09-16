@@ -1,9 +1,12 @@
-"""Run the reproducible MSE-1 preprocessing and EDA pipeline."""
+"""Run audit, final-dataset preprocessing, EDA, and model identification."""
 
-from src.preprocessing.build_mse1_dataset import main as build_dataset
-from src.eda.run_eda import main as run_eda
+from src.data_audit import main as audit
+from src.preprocessing.pipeline import main as preprocess
+from src.eda.report import main as run_eda
+from src.model_identification import main as identify_models
 
 
 if __name__ == "__main__":
-    if build_dataset() == 0:
-        raise SystemExit(run_eda())
+    for step in (audit, preprocess, run_eda, identify_models):
+        if step() != 0:
+            raise SystemExit(1)

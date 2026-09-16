@@ -1,254 +1,433 @@
-"""NE-Hazard Intelligence dashboard backed by the project's real outputs."""
+"""Interactive MSE-1 environmental-intelligence dashboard."""
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
-import streamlit.components.v1 as components
 
 
 ROOT = Path(__file__).resolve().parents[1]
-MASTER_PATH = ROOT / "data" / "processed" / "mse1_master.csv"
-AVAILABILITY_PATH = ROOT / "data" / "processed" / "mse1_data_availability.json"
+DATA_PATH = ROOT / "data" / "processed" / "final_dataset_features.csv"
+AUDIT_PATH = ROOT / "outputs" / "data_audit" / "audit_summary.json"
+PREPROCESSING_PATH = ROOT / "data" / "processed" / "preprocessing_summary.json"
 EDA_ROOT = ROOT / "outputs" / "eda"
-MODEL_ROOT = ROOT / "outputs" / "models"
 
-st.set_page_config(page_title="NE-Hazard Intelligence", page_icon="N", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(
+    page_title="NE Hazard Intelligence",
+    page_icon="N",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+
+FEATURE_LABELS = {
+    "rain_1d_mm": "Rainfall (1 day)",
+    "rain_3d_mm": "Rainfall (3 days)",
+    "rain_7d_mm": "Rainfall (7 days)",
+    "rain_3d_prev_mm": "Previous rainfall (3 days)",
+    "rain_7d_prev_mm": "Previous rainfall (7 days)",
+    "elevation": "Elevation",
+    "slope": "Slope",
+    "aspect": "Aspect",
+    "TWI": "TWI",
+    "SPI": "SPI",
+    "ndvi": "NDVI",
+    "land_cover_class": "Land-cover class",
+    "distance_to_river_km": "Distance to river (km)",
+    "distance_to_road_km": "Distance to road (km)",
+    "flood_label": "Flood label",
+    "landslide_label_static": "Static landslide susceptibility",
+}
+
+FEATURE_GROUPS = {
+    "Climate": ["rain_1d_mm", "rain_3d_mm", "rain_7d_mm", "rain_3d_prev_mm", "rain_7d_prev_mm"],
+    "Terrain": ["elevation", "slope", "aspect", "aspect_sin", "aspect_cos", "TWI", "SPI"],
+    "Land surface": ["ndvi", "land_cover_class", "soil_type", "soil_type_code"],
+    "Hydrology / infrastructure": ["distance_to_river_km", "distance_to_road_km", "station_count", "interpolation_method"],
+    "Exposure": ["population_2011", "households_2011", "literacy_rate_2011", "work_participation_rate_2011"],
+    "Hazard labels": ["flood_label", "landslide_label_daily", "landslide_label_static"],
+}
+
+SPATIAL_FEATURES = [
+    "rain_1d_mm", "rain_3d_mm", "rain_7d_mm", "elevation", "slope", "TWI", "SPI", "ndvi",
+    "distance_to_river_km", "distance_to_road_km", "flood_label", "landslide_label_static",
+]
+
+
+def inject_style() -> None:
+    st.markdown(
+        """
+        <style>
+        :root { --ink:#142f3f; --muted:#526875; --teal:#087f78; --teal-dark:#075b5c; --navy:#102f43; --rust:#a84f2d; --amber:#b66b13; --paper:#eef3f1; --line:#d4e0dc; --card:#ffffff; }
+        .stApp { background:var(--paper); color:var(--ink); }
+        [data-testid="stSidebar"] { background:var(--navy); border-right:1px solid #274d61; }
+        [data-testid="stSidebar"] * { color:#f6faf9 !important; }
+        [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p { color:#c9dbdf !important; }
+        [data-testid="stSidebar"] [data-baseweb="radio"] label { border-radius:5px; padding:.5rem .65rem; margin:.12rem 0; color:#eaf4f2 !important; }
+        [data-testid="stSidebar"] [data-baseweb="radio"] label:hover { background:#1b4a5a; }
+        [data-testid="stSidebar"] [aria-checked="true"] + div { color:#ffffff !important; }
+        h1,h2,h3,h4 { color:var(--ink) !important; letter-spacing:0; }
+        p, li, label, [data-testid="stCaptionContainer"] { color:var(--ink); }
+        [data-testid="stCaptionContainer"] p { color:var(--muted) !important; }
+        [data-testid="stMetric"] { background:var(--card); border:1px solid var(--line); border-top:3px solid var(--teal); border-radius:7px; padding:.85rem .95rem; min-height:112px; box-shadow:0 2px 8px rgba(20,47,63,.07); }
+        [data-testid="stMetricLabel"] p { color:var(--muted) !important; font-size:.76rem; font-weight:700; line-height:1.2; }
+        [data-testid="stMetricValue"] { color:var(--navy) !important; font-size:1.55rem; font-weight:800; }
+        [data-testid="stMetricDelta"] { color:var(--muted) !important; }
+        .hero { background:#123f4d; border:1px solid #2d6670; color:white; padding:2rem 2.2rem; border-radius:8px; margin-bottom:1.25rem; box-shadow:0 5px 18px rgba(16,47,67,.16); position:relative; overflow:hidden; }
+        .hero:after { content:""; position:absolute; right:-5rem; top:-6rem; width:19rem; height:19rem; border:1px solid rgba(188,220,212,.22); border-radius:50%; box-shadow:0 0 0 24px rgba(188,220,212,.06), 0 0 0 48px rgba(188,220,212,.04); }
+        .hero h1 { color:white !important; font-size:2.25rem; line-height:1.12; margin:0 0 .5rem; position:relative; z-index:1; }
+        .hero p { color:#e2f0ee !important; max-width:850px; margin:0; position:relative; z-index:1; }
+        .callout { background:#fff8ee; color:var(--ink); border:1px solid #ead8bf; border-left:4px solid var(--rust); border-radius:5px; padding:.8rem 1rem; margin:.8rem 0 1.2rem; }
+        .callout b { color:var(--rust); }
+        .flow { display:flex; gap:.45rem; align-items:stretch; margin:1rem 0 1.3rem; }
+        .flow-step { flex:1; background:var(--card); color:var(--ink); border:1px solid var(--line); border-top:4px solid var(--teal); border-radius:5px; padding:.8rem; min-height:86px; box-shadow:0 2px 7px rgba(20,47,63,.05); }
+        .flow-step strong { display:block; color:var(--navy); font-size:.8rem; }
+        .flow-step span { color:var(--muted); font-size:.75rem; }
+        .flow-arrow { align-self:center; color:var(--rust); font-size:1.2rem; }
+        .section-kicker { color:var(--teal-dark); font-size:.72rem; font-weight:800; letter-spacing:.12em; text-transform:uppercase; margin:.2rem 0 .25rem; }
+        .metric-card { background:var(--card); border:1px solid var(--line); border-top:3px solid var(--teal); border-radius:7px; padding:.85rem .95rem; min-height:112px; box-shadow:0 2px 8px rgba(20,47,63,.07); }
+        .metric-card .metric-label { color:var(--muted); font-size:.76rem; font-weight:700; line-height:1.25; min-height:2.1em; }
+        .metric-card .metric-value { color:var(--navy); font-size:1.55rem; font-weight:800; line-height:1.15; margin:.35rem 0 .15rem; }
+        .metric-card .metric-subtitle { color:var(--muted); font-size:.7rem; line-height:1.2; }
+        .metric-card.missing { border-top-color:var(--amber); }
+        .metric-card.missing .metric-value { color:var(--amber); }
+        .warning-panel { background:#fff8ee; border:1px solid #ead8bf; border-left:4px solid var(--amber); color:var(--ink); border-radius:6px; padding:1rem 1.1rem; }
+        div[data-testid="stDataFrame"] { border:1px solid var(--line); border-radius:6px; }
+        @media (max-width: 900px) { .flow { flex-direction:column; } .flow-arrow { transform:rotate(90deg); } .hero h1 { font-size:1.75rem; } }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+@st.cache_data(show_spinner="Loading the processed final dataset...")
+def load_data() -> pd.DataFrame:
+    if not DATA_PATH.exists():
+        raise FileNotFoundError(f"Processed dataset not found: {DATA_PATH}")
+    data = pd.read_csv(DATA_PATH, parse_dates=["date"], low_memory=False)
+    data["date_only"] = data["date"].dt.date
+    return data
 
 
 @st.cache_data
-def load_csv(path: str) -> pd.DataFrame:
-    return pd.read_csv(path)
+def load_json(path_string: str) -> dict[str, Any]:
+    path = Path(path_string)
+    if not path.exists():
+        return {}
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 @st.cache_data
-def load_json(path: str) -> dict:
-    with open(path, encoding="utf-8") as input_file:
-        return json.load(input_file)
+def cell_daily_view(data: pd.DataFrame, date_value: str) -> pd.DataFrame:
+    view = data[data["date"].dt.strftime("%Y-%m-%d") == date_value].copy()
+    return view.sort_values("cell_id")
 
 
-def css() -> None:
-    st.markdown("""
-    <style>
-    :root { --ink:#183234; --muted:#607477; --teal:#087f78; --gold:#d98b2b; --paper:#f4f7f5; }
-    .stApp { background: #f4f7f5; color: var(--ink); }
-    [data-testid="stSidebar"] { background: #163b3b; }
-    [data-testid="stSidebar"] * { color: #eff8f4 !important; }
-    [data-testid="stSidebar"] .stRadio label { padding: .25rem 0; }
-    h1, h2, h3 { color: var(--ink); letter-spacing: 0; }
-    .hero { background: linear-gradient(120deg,#123e3d,#1e6860); color:white; padding:2.3rem 2.5rem; border-radius:8px; margin-bottom:1.4rem; }
-    .hero h1 { color:white; font-size:2.35rem; line-height:1.12; margin:0 0 .55rem; }
-    .hero p { color:#d9efea; font-size:1.03rem; max-width:850px; margin:0; }
-    .eyebrow { color:#b9dfd4; font-size:.78rem; font-weight:700; letter-spacing:.12em; text-transform:uppercase; margin-bottom:.7rem; }
-    .card { background:white; border:1px solid #dce8e3; border-radius:8px; padding:1.05rem 1.15rem; min-height:135px; }
-    .card h4 { margin:0 0 .45rem; color:#173f40; }
-    .card p { color:#607477; font-size:.88rem; margin:.25rem 0; }
-    .tag { display:inline-block; padding:.18rem .5rem; border-radius:12px; font-size:.72rem; font-weight:700; background:#e1f2ec; color:#176358; }
-    .tag.dim { background:#edf1ef; color:#697979; }
-    .section-note { color:#607477; margin-top:-.45rem; margin-bottom:1rem; }
-    .pipeline { display:flex; gap:.5rem; align-items:stretch; margin:1.2rem 0 1.6rem; }
-    .step { flex:1; background:white; border-top:4px solid #16877c; padding:.85rem .8rem; border-radius:5px; box-shadow:0 1px 4px #173f4012; }
-    .step b { display:block; font-size:.82rem; color:#173f40; }
-    .step span { display:block; color:#718080; font-size:.75rem; margin-top:.3rem; }
-    .arrow { align-self:center; color:#d98b2b; font-size:1.2rem; }
-    .mini-title { text-transform:uppercase; letter-spacing:.08em; font-size:.72rem; color:#087f78; font-weight:800; }
-    </style>
-    """, unsafe_allow_html=True)
+@st.cache_data
+def cell_summary(data: pd.DataFrame) -> pd.DataFrame:
+    aggregations = {
+        "latitude": ("latitude", "first"),
+        "longitude": ("longitude", "first"),
+        "date": ("date", "first"),
+        "flood_frequency": ("flood_label", "mean"),
+        "landslide_susceptibility": ("landslide_label_static", "first"),
+    }
+    for feature in SPATIAL_FEATURES:
+        if feature not in {"flood_label", "landslide_label_static"} and feature in data:
+            aggregations[feature] = (feature, "mean")
+    return data.groupby("cell_id", as_index=False).agg(**aggregations)
 
 
-def table(data: pd.DataFrame, height: int = 320) -> None:
-    st.dataframe(data, use_container_width=True, height=height, hide_index=True)
-
-
-def metric_row(data: pd.DataFrame) -> None:
-    cells, features = data.shape
-    numeric = len(data.select_dtypes(include="number").columns)
-    regions = data["region"].nunique()
-    a, b, c, d = st.columns(4)
-    a.metric("Grid cells", f"{cells:,}")
-    b.metric("Current study states", regions)
-    c.metric("Dataset fields", features)
-    d.metric("Numeric fields", numeric)
-
-
-def source_cards() -> None:
-    sources = [
-        ("Rainfall", "NASA GPM IMERG", "3 h / 24 h / 3 d / 7 d accumulation windows", "0.1° · half-hourly source", "To be integrated", False),
-        ("Flood observations", "Bhuvan / authoritative flood inventory", "Observed flood-event labels", "Annual/event layers · coverage varies", "To be integrated", False),
-        ("Landslide inventory", "Bhuvan / GSI inventory", "Observed landslide-event labels", "Event/season inventory · coverage varies", "To be integrated", False),
-        ("Terrain", "SRTM DEM", "Elevation, slope, aspect", "30 m · static terrain", "Not populated in master", False),
-        ("Satellite", "Sentinel-1 / Sentinel-2", "NDVI, NDWI, environmental indicators", "10–60 m products · scene-based", "To be integrated", False),
-        ("Geographic features", "OpenStreetMap", "River and road proximity", "Vector · continuously edited", "Boundary polygons only", False),
-        ("Population", "WorldPop", "Population exposure", "100 m / 1 km products · annual", "To be integrated", False),
+def metric_cards(data: pd.DataFrame) -> None:
+    values = [
+        ("Observations", f"{len(data):,}", "daily records", False),
+        ("Spatial cells", f"{data['cell_id'].nunique():,}", "unique cells", False),
+        ("Resolution", "Daily", "temporal resolution", False),
+        ("Coverage", f"{data['date'].min():%Y}–{data['date'].max():%Y}", "observation period", False),
+        ("Flood-labelled", f"{int(data['flood_label'].sum()):,}", "observed labels", False),
+        ("Susceptibility", f"{int(data['landslide_label_static'].sum()):,}", "static observations", False),
     ]
-    cols = st.columns(3)
-    for index, (title, source, purpose, detail, status, available) in enumerate(sources):
-        with cols[index % 3]:
-            badge = "Integrated" if available else "Not yet integrated"
-            dim = "" if available else "dim"
-            st.markdown(f'<div class="card"><div class="mini-title">{title}</div><h4>{source}</h4><p>{purpose}</p><p><small>{detail}</small></p><span class="tag {dim}">{badge}</span><p><small>{status}</small></p></div>', unsafe_allow_html=True)
+    cards = st.columns(6)
+    for card, (label, value, subtitle, missing) in zip(cards, values):
+        with card:
+            metric_card(label, value, subtitle, missing)
 
 
-def regional_context_svg() -> str:
-    # Geographic context only: no observations or values are encoded for future states.
-    states = [("Arunachal Pradesh", 285, 75, False), ("Sikkim", 175, 215, False), ("Assam", 310, 220, True), ("Nagaland", 465, 245, False), ("Manipur", 470, 330, False), ("Meghalaya", 275, 345, True), ("Tripura", 215, 430, False), ("Mizoram", 375, 420, False)]
-    shapes = []
-    for name, x, y, current in states:
-        fill = "#16877c" if current else "#c9d8d3"
-        stroke = "#0b5b57" if current else "#8ba09a"
-        text = "white" if current else "#294648"
-        shapes.append(f'<rect x="{x}" y="{y}" width="110" height="54" rx="5" fill="{fill}" stroke="{stroke}" stroke-width="2"/><text x="{x + 55}" y="{y + 31}" text-anchor="middle" font-family="sans-serif" font-size="11" fill="{text}">{name}</text>')
-    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 620 530" style="width:100%;background:#edf5f1;border-radius:8px"><text x="24" y="31" font-family="sans-serif" font-size="18" font-weight="700" fill="#173f40">North-East India | regional context</text><text x="24" y="52" font-family="sans-serif" font-size="12" fill="#607477">Teal = current modelling area · grey = future regional context</text>' + ''.join(shapes) + '<text x="24" y="505" font-family="sans-serif" font-size="12" fill="#607477">State context is geographic orientation only; no future-state observations are implied.</text></svg>'
+def metric_card(label: str, value: str, subtitle: str, missing: bool = False) -> None:
+    modifier = " missing" if missing else ""
+    st.markdown(
+        f'<div class="metric-card{modifier}"><div class="metric-label">{label}</div>'
+        f'<div class="metric-value">{value}</div><div class="metric-subtitle">{subtitle}</div></div>',
+        unsafe_allow_html=True,
+    )
+
+
+def flow() -> None:
+    st.markdown(
+        '<div class="flow">'
+        '<div class="flow-step"><strong>01 · INPUTS</strong><span>Environmental, geospatial and exposure data</span></div><div class="flow-arrow">→</div>'
+        '<div class="flow-step"><strong>02 · PREPROCESSING</strong><span>Cleaning and feature engineering</span></div><div class="flow-arrow">→</div>'
+        '<div class="flow-step"><strong>03 · EDA</strong><span>Spatial, temporal and hazard patterns</span></div><div class="flow-arrow">→</div>'
+        '<div class="flow-step"><strong>04 · MODELLING</strong><span>Flood model and susceptibility layer</span></div><div class="flow-arrow">→</div>'
+        '<div class="flow-step"><strong>05 · DECISION SUPPORT</strong><span>Future risk interpretation and warning design</span></div>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def map_chart(data: pd.DataFrame, feature: str, title: str, sample_limit: int = 1200) -> None:
+    points = data[["cell_id", "latitude", "longitude", "date", feature]].dropna(subset=["latitude", "longitude", feature]).copy()
+    if len(points) > sample_limit:
+        points = points.sample(sample_limit, random_state=42)
+    points["date"] = points["date"].dt.strftime("%Y-%m-%d")
+    chart = px.scatter_map(
+        points,
+        lat="latitude",
+        lon="longitude",
+        color=feature,
+        hover_name="cell_id",
+        hover_data={"latitude": ":.4f", "longitude": ":.4f", "date": True, feature: ":.3f"},
+        color_continuous_scale="Tealgrn",
+        zoom=5.5,
+        height=540,
+        title=title,
+    )
+    chart.update_layout(margin={"r": 0, "t": 48, "l": 0, "b": 0})
+    st.plotly_chart(chart, use_container_width=True)
+
+
+def date_filter(data: pd.DataFrame, key: str) -> tuple[pd.DataFrame, Any, Any]:
+    start = data["date"].min().date()
+    end = data["date"].max().date()
+    selected = st.date_input("Date range", (start, end), min_value=start, max_value=end, key=key)
+    if isinstance(selected, tuple) and len(selected) == 2:
+        return data[data["date_only"].between(selected[0], selected[1])], selected[0], selected[1]
+    return data[data["date_only"] == selected], selected, selected
 
 
 def overview(data: pd.DataFrame) -> None:
-    st.markdown('<div class="hero"><div class="eyebrow">Environmental intelligence platform</div><h1>NE-Hazard Intelligence</h1><p>AI & GIS-Based Multi-Hazard Risk Assessment and Early-Warning System for North-East India</p></div>', unsafe_allow_html=True)
-    st.write("A spatial decision workflow for understanding rainfall, terrain, exposure and hazard history before producing flood and landslide intelligence. The current modelling study is Assam + Meghalaya within the wider North-East India vision.")
-    metric_row(data)
-    st.markdown('<div class="pipeline"><div class="step"><b>01 · DATA SOURCES</b><span>Rainfall, terrain, satellite, hazards, exposure</span></div><div class="arrow">→</div><div class="step"><b>02 · PROCESSING</b><span>Spatial alignment, cleaning, feature preparation</span></div><div class="arrow">→</div><div class="step"><b>03 · EDA</b><span>Patterns, distributions, correlations, spatial analysis</span></div><div class="arrow">→</div><div class="step"><b>04 · AI MODELS</b><span>Classification strategy for flood and landslide</span></div><div class="arrow">→</div><div class="step"><b>05 · EARLY WARNING</b><span>Future risk zones and alert logic</span></div></div>', unsafe_allow_html=True)
-    st.subheader("Study geography")
-    left, right = st.columns([1.1, 1])
-    with left:
-        components.html(regional_context_svg(), height=550)
-    with right:
-        st.markdown('<div class="card"><div class="mini-title">Project region</div><h3>North-East India</h3><p>The complete eight-state region is the long-term project scope.</p><hr><div class="mini-title">Current study area</div><h3>Assam + Meghalaya</h3><p>The teal states are the only states represented in the current real processed grid.</p></div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="hero"><h1>Multi-Hazard Risk Assessment and Early-Warning System</h1>'
+        '<p>AI and GIS-based environmental intelligence for Assam + Meghalaya, within the wider North-East India project context.</p></div>',
+        unsafe_allow_html=True,
+    )
+    st.write("The system integrates daily environmental conditions, terrain, hydrology, land-surface characteristics and exposure information to support flood assessment, landslide susceptibility analysis, and future decision support.")
+    metric_cards(data)
+    st.subheader("Study region")
+    st.write("Assam + Meghalaya. The current implementation is an MSE-1 analytical foundation; it does not provide validated real-time operational warnings.")
+    map_chart(data.groupby("cell_id", as_index=False).first(), "landslide_label_static", "Spatial study-region coverage")
+    st.subheader("Methodology flow")
+    flow()
+    st.markdown('<div class="callout"><b>Current status:</b> observed labels and susceptibility are available for analysis. Validated flood probabilities and warning statuses are reserved for MSE-2 and later deployment work.</div>', unsafe_allow_html=True)
 
 
-def data_sources(data: pd.DataFrame, availability: dict) -> None:
+def study_region(data: pd.DataFrame) -> None:
+    st.header("Study Region")
+    st.write("Explore actual cell coordinates and selected daily environmental values. Spatial plots are sampled or cell-aggregated so the browser never renders all 522,522 observations.")
+    dates = sorted(data["date_only"].unique())
+    selected_date = st.selectbox("Date", dates, index=len(dates) - 1, format_func=str)
+    daily = cell_daily_view(data, str(selected_date))
+    cells = ["All cells"] + sorted(daily["cell_id"].unique().tolist())
+    selected_cell = st.selectbox("Cell", cells)
+    feature_options = [feature for feature in SPATIAL_FEATURES if feature in daily.columns]
+    feature = st.selectbox("Map variable", feature_options, format_func=lambda value: FEATURE_LABELS.get(value, value))
+    if selected_cell != "All cells":
+        daily = daily[daily["cell_id"] == selected_cell]
+    map_chart(daily, feature, f"{FEATURE_LABELS.get(feature, feature)} on {selected_date}")
+    if selected_cell != "All cells":
+        st.subheader(f"Cell profile: {selected_cell}")
+        st.dataframe(daily.drop(columns=["date_only"], errors="ignore").T.rename(columns={daily.index[0]: "value"}), use_container_width=True)
+
+
+def data_sources(data: pd.DataFrame) -> None:
     st.header("Data & Sources")
-    st.write("The project uses source-specific layers that will eventually meet on a common approximately 0.1-degree modelling grid. Statuses below describe the actual current files, not intended downloads.")
-    source_cards()
-    st.subheader("Current source record")
-    table(pd.DataFrame(availability.get("real_sources_used", [])))
-
-
-def feature_groups(data: pd.DataFrame) -> pd.DataFrame:
-    groups = {"Rainfall": ["rain_3h", "rain_24h", "rain_3d", "rain_7d"], "Terrain": ["elevation", "slope", "aspect"], "Satellite": ["NDVI", "NDWI"], "Geographic": ["distance_to_river_km", "distance_to_road_km"], "Exposure": ["population_density"], "Targets": ["flood", "landslide"]}
+    st.write("This inventory describes fields present in the processed final dataset. Source claims are limited to what is documented in the repository.")
     rows = []
-    for group, fields in groups.items():
-        present = [field for field in fields if field in data and data[field].notna().any()]
-        rows.append({"feature_group": group, "fields": ", ".join(fields), "populated_fields": len(present), "total_fields": len(fields), "coverage": f"{len(present)}/{len(fields)}"})
-    return pd.DataFrame(rows)
+    for group, fields in FEATURE_GROUPS.items():
+        for field in fields:
+            if field not in data.columns:
+                continue
+            role = "Hazard target" if field.endswith("_label") else "Predictor / context"
+            if field in {"population_2011", "households_2011", "literacy_rate_2011", "work_participation_rate_2011"}:
+                role = "Exposure / vulnerability context"
+            rows.append({"category": group, "feature": field, "data_type": str(data[field].dtype), "missing_percent": round(float(data[field].isna().mean() * 100), 3), "role": role})
+    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True, height=560)
+    with st.expander("Documented dataset facts"):
+        st.write(f"Rows: {len(data):,}; columns in processed artifact: {len(data.columns)}; cells: {data['cell_id'].nunique():,}; daily coverage: {data['date'].min():%Y-%m-%d} to {data['date'].max():%Y-%m-%d}.")
 
 
-def explorer(data: pd.DataFrame) -> None:
-    st.header("Dataset Explorer")
-    st.markdown('<div class="section-note">A human-readable view of what each data family contributes to the environmental intelligence workflow.</div>', unsafe_allow_html=True)
-    metric_row(data)
-    a, b = st.columns([1.3, 1])
-    with a:
-        st.subheader("Actual dataset preview")
-        table(data.head(15), 390)
-    with b:
-        st.subheader("Cells by current state")
-        st.bar_chart(data.groupby("region").size().rename("grid_cells"))
-        st.caption("These are grid cells, not hazard events.")
-    st.subheader("Feature groups and completeness")
-    groups = feature_groups(data)
-    table(groups)
-    st.bar_chart(groups.set_index("feature_group")["populated_fields"])
-
-
-def preparation(data: pd.DataFrame) -> None:
+def data_preparation(data: pd.DataFrame) -> None:
     st.header("Data Preparation")
-    st.write("The preparation workflow converts real state boundary inputs into a common spatial representation. Missing environmental and hazard inputs remain missing; they are never replaced with synthetic values.")
-    st.markdown('<div class="pipeline"><div class="step"><b>RAW GEOGRAPHY</b><span>Assam and Meghalaya polygons</span></div><div class="arrow">→</div><div class="step"><b>BOUNDARY FILTER</b><span>Cell centres inside supplied polygons</span></div><div class="arrow">→</div><div class="step"><b>COMMON GRID</b><span>Approximately 0.1-degree cells</span></div><div class="arrow">→</div><div class="step"><b>QUALITY CHECKS</b><span>Stable IDs, coordinates, missingness</span></div><div class="arrow">→</div><div class="step"><b>FEATURE READY</b><span>Source fields retained for later joins</span></div></div>', unsafe_allow_html=True)
-    left, right = st.columns(2)
-    with left:
-        st.subheader("Grid output")
-        table(data[["cell_id", "region", "latitude", "longitude"]].head(12))
-    with right:
-        st.subheader("Preparation decisions")
-        st.markdown("- Stable `cell_id` for every cell\n- Latitude/longitude retained\n- Source-native precision is not overstated\n- Missing values preserved\n- Future model preparation must avoid temporal leakage")
-    st.info("Current master coverage is spatial. There is no event period in the available inputs, so rainfall windows and hazard labels are not attached.")
+    audit = load_json(str(AUDIT_PATH))
+    preprocessing = load_json(str(PREPROCESSING_PATH))
+    a, b, c, d = st.columns(4)
+    a.metric("Original rows", f"{audit.get('rows', len(data)):,}")
+    b.metric("Original columns", audit.get("columns", 25))
+    c.metric("Duplicate rows", audit.get("duplicate_rows", "n/a"))
+    d.metric("Duplicate keys", audit.get("duplicate_cell_date_keys", "n/a"))
+    st.subheader("Missing-value profile")
+    missing = data.drop(columns=["date_only"], errors="ignore").isna().sum().sort_values().rename("missing_count").reset_index()
+    missing.columns = ["feature", "missing_count"]
+    missing["available_count"] = len(data) - missing["missing_count"]
+    chart = px.bar(missing, x="feature", y=["available_count", "missing_count"], title="Available versus missing values", barmode="stack", height=480)
+    chart.update_layout(xaxis_tickangle=-45)
+    st.plotly_chart(chart, use_container_width=True)
+    st.subheader("Implemented flow")
+    st.write("Raw Dataset → Date parsing → Duplicate verification → Temporal feature engineering → Rainfall accumulation → Aspect transformation → Missingness indicators → Model-ready dataset")
+    engineered = preprocessing.get("feature_engineering", [])
+    st.write("Engineered features:", ", ".join(engineered) if engineered else "See preprocessing summary")
+    st.info("The raw final CSV remains untouched. No imputation is performed in the processed artifact; modelling imputers are intended to fit training data only.")
+
+
+def numeric_distribution(data: pd.DataFrame, feature: str, title: str) -> None:
+    sample = data[[feature, "flood_label"]].dropna()
+    if len(sample) > 50_000:
+        sample = sample.sample(50_000, random_state=42)
+    st.plotly_chart(px.histogram(sample, x=feature, color="flood_label", marginal="box", title=title, nbins=50), use_container_width=True)
 
 
 def exploratory_analysis(data: pd.DataFrame) -> None:
     st.header("Exploratory Analysis")
-    st.markdown('<div class="section-note">Explore only variables with actual values. At present, the measured numerical fields are the grid coordinates.</div>', unsafe_allow_html=True)
-    load_json(str(EDA_ROOT / "dataset_summary.json"))
-    metric_row(data)
-    left, right = st.columns(2)
-    with left:
-        st.subheader("Region distribution")
-        st.bar_chart(data.groupby("region").size().rename("grid_cells"))
-    with right:
-        st.subheader("Available numerical distributions")
-        distributions = load_csv(str(EDA_ROOT / "feature_distributions.csv"))
-        available = distributions[distributions["count"] > 0]
-        if available.empty:
-            st.info("No environmental feature distributions are available yet.")
-        else:
-            st.bar_chart(available.set_index("feature")["mean"])
-    tab1, tab2, tab3 = st.tabs(["Completeness", "Correlation", "Spatial EDA"])
-    with tab1:
-        missing = load_csv(str(EDA_ROOT / "missing_values.csv"))
-        st.bar_chart(missing.set_index("column")["missing_percent"])
-        st.caption("100% means the field is currently unpopulated; this chart reports data availability, not imputed values.")
-    with tab2:
-        corr = load_csv(str(EDA_ROOT / "correlations.csv"))
-        st.dataframe(corr.style.background_gradient(cmap="YlGnBu", axis=None).format(precision=2), use_container_width=True, height=360)
-    with tab3:
-        st.write("Spatial EDA of the current modelling grid:")
-        st.map(data[["latitude", "longitude"]].rename(columns={"latitude": "lat", "longitude": "lon"}), zoom=6, use_container_width=True)
-        svg = EDA_ROOT / "spatial_grid.svg"
-        if svg.exists():
-            components.html(svg.read_text(encoding="utf-8"), height=500, scrolling=True)
+    st.caption("Interactive MSE-1 exploration of the processed final dataset. Charts use filtering and bounded samples where needed.")
+    view, _, _ = date_filter(data, "eda_date_range")
+    seasons = ["All seasons"] + sorted(data["season"].dropna().unique().tolist())
+    season = st.selectbox("Season", seasons)
+    if season != "All seasons":
+        view = view[view["season"] == season]
+    hazard = st.selectbox("Hazard selector", ["Flood label", "Static landslide susceptibility", "Daily landslide label"])
+    hazard_column = {"Flood label": "flood_label", "Static landslide susceptibility": "landslide_label_static", "Daily landslide label": "landslide_label_daily"}[hazard]
+    feature_choices = [feature for feature in FEATURE_LABELS if feature in view.columns and feature not in {"flood_label", "landslide_label_static"}]
+    feature = st.selectbox("Feature selector", feature_choices, format_func=lambda value: FEATURE_LABELS.get(value, value))
+    tabs = st.tabs(["Overview", "Rainfall", "Terrain", "Labels", "Spatial"])
+    with tabs[0]:
+        metric_cards(view)
+        st.plotly_chart(px.histogram(view.sample(min(len(view), 40_000), random_state=42), x=feature, color=hazard_column, title=f"{FEATURE_LABELS.get(feature, feature)} by {hazard}"), use_container_width=True)
+        st.plotly_chart(px.imshow(view.select_dtypes(include="number").corr(), color_continuous_scale="Tealgrn", aspect="auto", title="Correlation heatmap"), use_container_width=True)
+    with tabs[1]:
+        for rainfall in ["rain_1d_mm", "rain_3d_mm", "rain_7d_mm"]:
+            numeric_distribution(view, rainfall, FEATURE_LABELS[rainfall])
+        monthly = view.assign(month=view["date"].dt.month).groupby("month", as_index=False)["rain_1d_mm"].mean()
+        st.plotly_chart(px.bar(monthly, x="month", y="rain_1d_mm", title="Monthly mean rainfall"), use_container_width=True)
+        seasonal = view.groupby("season", as_index=False)["rain_1d_mm"].mean()
+        st.plotly_chart(px.bar(seasonal, x="season", y="rain_1d_mm", title="Seasonal mean rainfall"), use_container_width=True)
+    with tabs[2]:
+        for terrain in ["elevation", "slope", "TWI", "SPI", "ndvi", "distance_to_river_km", "distance_to_road_km"]:
+            numeric_distribution(view, terrain, FEATURE_LABELS.get(terrain, terrain))
+    with tabs[3]:
+        label_counts = pd.DataFrame({"flood_label": data["flood_label"].value_counts(), "landslide_label_daily": data["landslide_label_daily"].value_counts(), "landslide_label_static": data["landslide_label_static"].value_counts()}).fillna(0).reset_index(names="class")
+        st.plotly_chart(px.bar(label_counts, x="class", y=label_counts.columns[1:], barmode="group", title="Flood and landslide label distributions"), use_container_width=True)
+        st.plotly_chart(px.scatter(view.sample(min(len(view), 30_000), random_state=42), x="rain_1d_mm", y="flood_label", color="flood_label", title="Rainfall versus flood label", hover_data=["cell_id", "date"]), use_container_width=True)
+        st.plotly_chart(px.box(view.sample(min(len(view), 30_000), random_state=42), x="flood_label", y=feature, title=f"{FEATURE_LABELS.get(feature, feature)} versus flood label"), use_container_width=True)
+    with tabs[4]:
+        summary = cell_summary(view)
+        map_chart(summary, "flood_frequency", "Spatial flood frequency", sample_limit=693)
+        map_chart(summary, "landslide_susceptibility", "Spatial landslide susceptibility", sample_limit=693)
 
 
-def model_lab() -> None:
+def hazard_intelligence(data: pd.DataFrame) -> None:
+    st.header("Hazard Intelligence")
+    st.markdown('<div class="callout"><b>Terminology:</b> flood values are observed labels; static landslide values are susceptibility information; no model predictions are available in MSE-1.</div>', unsafe_allow_html=True)
+    flood, landslide = st.tabs(["Flood · observed labels", "Landslide · static susceptibility"])
+    with flood:
+        st.subheader("Observed flood-labelled observations")
+        st.metric("Flood-labelled observations", f"{int(data['flood_label'].sum()):,}")
+        flood_data = data[data["flood_label"] == 1]
+        context = flood_data[["rain_1d_mm", "rain_3d_mm", "rain_7d_mm", "elevation", "slope", "TWI", "distance_to_river_km"]].describe().T
+        st.dataframe(context, use_container_width=True)
+        st.plotly_chart(px.scatter(flood_data, x="rain_1d_mm", y="elevation", color="slope", hover_data=["cell_id", "date"], title="Observed flood labels: rainfall and elevation"), use_container_width=True)
+        map_chart(cell_summary(data), "flood_frequency", "Observed spatial flood frequency", sample_limit=693)
+    with landslide:
+        st.subheader("Static landslide susceptibility")
+        st.metric("Susceptibility-positive observations", f"{int(data['landslide_label_static'].sum()):,}")
+        st.write("This repeated spatial layer is not a daily prediction and is not presented as an operational warning output.")
+        subset = data.sample(min(len(data), 30_000), random_state=42)
+        st.plotly_chart(px.scatter(subset, x="elevation", y="slope", color="landslide_label_static", size="rain_1d_mm", hover_data=["cell_id", "ndvi", "land_cover_class"], title="Static susceptibility with terrain and rainfall context"), use_container_width=True)
+        map_chart(cell_summary(data), "landslide_susceptibility", "Static landslide susceptibility", sample_limit=693)
+
+
+def ai_model_lab() -> None:
     st.header("AI Model Lab")
-    st.write("The model strategy is designed for future supervised hazard classification. No model is presented as trained until authoritative event labels are available.")
-    cards = [("Logistic Regression", "Interpretable baseline classification model."), ("Random Forest", "Nonlinear relationships and robust tabular modelling."), ("XGBoost", "Gradient-boosted tree candidate for environmental tabular data.")]
-    cols = st.columns(3)
-    for col, (name, role) in zip(cols, cards):
-        with col:
-            st.markdown(f'<div class="card"><div class="mini-title">Candidate model</div><h3>{name}</h3><p>{role}</p></div>', unsafe_allow_html=True)
-    st.markdown('<div class="pipeline"><div class="step"><b>ENVIRONMENTAL FEATURES</b><span>Rainfall, terrain, exposure, spatial context</span></div><div class="arrow">→</div><div class="step"><b>CLASSIFICATION MODEL</b><span>One task per hazard target</span></div><div class="arrow">→</div><div class="step"><b>FLOOD / LANDSLIDE PROBABILITY</b><span>Future model outputs only</span></div></div>', unsafe_allow_html=True)
-    readiness = load_json(str(MODEL_ROOT / "model_readiness.json"))
-    st.subheader("Current target readiness")
-    table(pd.DataFrame([{"target": target, **status} for target, status in readiness["target_status"].items()]))
-    st.warning("Model training is pending because authoritative flood/landslide labels are not currently available.")
+    st.info("MSE-1 model identification only. No accuracy, precision, recall, F1, ROC-AUC, PR-AUC, predictions, or alerts are displayed because training has not been performed.")
+    models = [
+        {"Model": "Logistic Regression", "Purpose": "Interpretable flood baseline", "Why suitable": "Strong transparent baseline for imbalanced tabular data", "Input characteristics": "Scaled numeric and encoded categorical features", "Advantages": "Coefficients are easy to inspect", "Limitations": "Linear decision boundary"},
+        {"Model": "Random Forest", "Purpose": "Nonlinear flood candidate", "Why suitable": "Captures interactions among rainfall, terrain and exposure", "Input characteristics": "Mixed tabular environmental features", "Advantages": "Robust nonlinear baseline and feature importance", "Limitations": "Can be biased by spatial dependence and imbalance"},
+        {"Model": "XGBoost", "Purpose": "Boosted-tree comparison", "Why suitable": "Often effective for structured tabular relationships", "Input characteristics": "Tabular environmental features", "Advantages": "Flexible nonlinear modelling", "Limitations": "Requires careful tuning and leakage-aware validation"},
+    ]
+    for model in models:
+        with st.expander(model["Model"], expanded=True):
+            st.table(pd.DataFrame([model]))
+    st.subheader("Current target formulation")
+    st.write("Flood → `flood_label` as the primary supervised target. Landslide → `landslide_label_static` as a spatial susceptibility formulation. `landslide_label_daily` is not used as a daily classifier because it has only six positive observations.")
+    st.subheader("MSE-2 — Model Training & Evaluation")
+    st.write("Model training is planned for MSE-2. Future evaluation will use precision, recall, F1, PR-AUC, ROC-AUC, confusion matrices, false-negative analysis, and spatial-temporal validation.")
 
 
 def spatial_intelligence(data: pd.DataFrame) -> None:
     st.header("Spatial Intelligence")
-    st.write("The map below is a real spatial view of the current grid. It is not a hazard, prediction, risk, or alert map.")
-    choice = st.selectbox("Current study area layer", ["All current cells", "Assam", "Meghalaya"])
-    view = data if choice == "All current cells" else data[data["region"] == choice]
-    st.map(view[["latitude", "longitude"]].rename(columns={"latitude": "lat", "longitude": "lon"}), zoom=6, use_container_width=True)
-    with st.expander("Regional context: North-East India", expanded=True):
-        components.html(regional_context_svg(), height=550)
-    st.caption("Enabled layer: current modelling grid. Rainfall, flood, landslide, terrain, exposure and risk layers are enabled only when populated real fields exist.")
+    st.write("Select a variable and date to inspect a cell-level interactive map. Hover over points for cell, coordinate, date, and feature values.")
+    dates = sorted(data["date_only"].unique())
+    selected_date = st.selectbox("Date", dates, index=len(dates) - 1, key="spatial_date")
+    feature = st.selectbox("Variable", [feature for feature in SPATIAL_FEATURES if feature in data.columns], format_func=lambda value: FEATURE_LABELS.get(value, value), key="spatial_feature")
+    daily = cell_daily_view(data, str(selected_date))
+    map_chart(daily, feature, f"{FEATURE_LABELS.get(feature, feature)} · {selected_date}", sample_limit=693)
+    selected_cell = st.selectbox("Cell detail", ["None"] + sorted(daily["cell_id"].unique().tolist()), key="spatial_cell")
+    if selected_cell != "None":
+        st.dataframe(daily[daily["cell_id"] == selected_cell].drop(columns=["date_only"], errors="ignore"), use_container_width=True, hide_index=True)
+
+
+def early_warning(data: pd.DataFrame) -> None:
+    st.header("Early Warning")
+    st.markdown('<div class="callout"><b>Non-operational architecture:</b> validated ML warning probability will be connected after MSE-2 model training. No alert is issued here.</div>', unsafe_allow_html=True)
+    dates = sorted(data["date_only"].unique())
+    selected_date = st.selectbox("Selected date", dates, index=len(dates) - 1, key="warning_date")
+    daily = cell_daily_view(data, str(selected_date))
+    selected_cell = st.selectbox("Selected cell", sorted(daily["cell_id"].unique().tolist()), key="warning_cell")
+    row = daily[daily["cell_id"] == selected_cell].iloc[0]
+    st.subheader("Current / selected environmental conditions")
+    values = [("Rainfall", "rain_1d_mm", "mm"), ("Previous 3-day accumulation", "rain_3d_prev_mm", "mm"), ("Previous 7-day accumulation", "rain_7d_prev_mm", "mm"), ("Elevation", "elevation", "m"), ("Slope", "slope", "degrees"), ("Distance to river", "distance_to_river_km", "km"), ("Population exposure", "population_2011", "")]
+    cards = st.columns(len(values))
+    for card, (label, field, unit) in zip(cards, values):
+        value = row[field]
+        with card:
+            if pd.isna(value):
+                metric_card(label, "Missing", "not available for selected cell", True)
+            else:
+                metric_card(label, f"{value:.2f} {unit}".strip(), "selected environmental value")
+    st.subheader("Decision-support architecture")
+    flow_items = ["Environmental Conditions", "Flood Model", "Hazard Probability", "Exposure + Vulnerability", "Risk Interpretation", "Warning / Decision Support"]
+    for index, item in enumerate(flow_items):
+        st.markdown(f"**{item}**" + ("  ↓" if index < len(flow_items) - 1 else ""))
+    st.info("Validated ML warning probability will be connected after MSE-2 model training. Current values are environmental context only, not predictions or warnings.")
 
 
 def main() -> None:
-    css()
-    data = load_csv(str(MASTER_PATH))
-    availability = load_json(str(AVAILABILITY_PATH))
-    st.sidebar.markdown("<h2 style='color:white;margin-bottom:0'>NE-Hazard<br>Intelligence</h2><p style='color:#b9dfd4'>AI + GIS environmental risk</p>", unsafe_allow_html=True)
-    page = st.sidebar.radio("Navigate", ["Overview", "Study Region", "Data & Sources", "Data Preparation", "Exploratory Analysis", "AI Model Lab", "Spatial Intelligence"])
+    inject_style()
+    data = load_data()
+    st.sidebar.title("NE Hazard Intelligence")
+    st.sidebar.caption("Assam + Meghalaya · MSE-1")
+    pages = ["Overview", "Study Region", "Data & Sources", "Data Preparation", "Exploratory Analysis", "Hazard Intelligence", "AI Model Lab", "Spatial Intelligence", "Early Warning"]
+    page = st.sidebar.radio("Navigate", pages, key="page")
     st.sidebar.divider()
-    st.sidebar.caption("Project region: North-East India\n\nCurrent study area: Assam + Meghalaya")
-    if page == "Overview":
-        overview(data)
-    elif page == "Study Region":
-        st.header("Study Region")
-        st.write("North-East India is the project region. Assam and Meghalaya are the current study area represented in the processed data; the other six states are regional context for future expansion.")
-        components.html(regional_context_svg(), height=570)
-    elif page == "Data & Sources":
-        data_sources(data, availability)
-    elif page == "Data Preparation":
-        preparation(data)
-    elif page == "Exploratory Analysis":
-        exploratory_analysis(data)
-    elif page == "AI Model Lab":
-        model_lab()
-    else:
-        spatial_intelligence(data)
+    st.sidebar.caption("Authoritative processed dataset")
+    st.sidebar.caption("Daily observations · 2021–2023")
+    handlers = {
+        "Overview": overview,
+        "Study Region": study_region,
+        "Data & Sources": data_sources,
+        "Data Preparation": data_preparation,
+        "Exploratory Analysis": exploratory_analysis,
+        "Hazard Intelligence": hazard_intelligence,
+        "AI Model Lab": lambda _: ai_model_lab(),
+        "Spatial Intelligence": spatial_intelligence,
+        "Early Warning": early_warning,
+    }
+    handlers[page](data)
 
 
 if __name__ == "__main__":

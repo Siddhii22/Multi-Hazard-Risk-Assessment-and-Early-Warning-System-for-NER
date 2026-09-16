@@ -1,0 +1,35 @@
+{
+  "status": "identification_only",
+  "dataset": "data\\processed\\final_dataset_features.csv",
+  "targets": {
+    "flood_label": {
+      "role": "primary dynamic supervised target",
+      "positive_observations": 311
+    },
+    "landslide_label_static": {
+      "role": "spatial susceptibility component; not a daily warning target",
+      "positive_observations": 146276
+    },
+    "landslide_label_daily": {
+      "role": "not modelled because the positive class is too sparse",
+      "positive_observations": 6
+    }
+  },
+  "candidate_models": {
+    "Logistic Regression": "scaled, interpretable baseline",
+    "Random Forest": "nonlinear tabular baseline with interactions",
+    "XGBoost": "optional candidate; dependency not installed"
+  },
+  "metrics": [
+    "precision",
+    "recall",
+    "F1",
+    "PR-AUC",
+    "ROC-AUC",
+    "confusion matrix",
+    "false-negative analysis"
+  ],
+  "validation": "Use temporal ordering and spatial holdouts where feasible; fit imputers and encoders on training data only.",
+  "trained": false,
+  "results": []
+}

@@ -1,0 +1,243 @@
+{
+  "dataset": "data\\master_dataset_FINAL_v4.csv",
+  "rows": 522522,
+  "columns": 25,
+  "column_names": [
+    "cell_id",
+    "date",
+    "latitude",
+    "longitude",
+    "soil_type_code",
+    "soil_type",
+    "elevation",
+    "slope",
+    "aspect",
+    "TWI",
+    "SPI",
+    "rain_1d_mm",
+    "station_count",
+    "interpolation_method",
+    "distance_to_river_km",
+    "distance_to_road_km",
+    "ndvi",
+    "land_cover_class",
+    "flood_label",
+    "landslide_label_daily",
+    "landslide_label_static",
+    "population_2011",
+    "households_2011",
+    "literacy_rate_2011",
+    "work_participation_rate_2011"
+  ],
+  "dtypes": {
+    "cell_id": "str",
+    "date": "str",
+    "latitude": "float64",
+    "longitude": "float64",
+    "soil_type_code": "int64",
+    "soil_type": "str",
+    "elevation": "float64",
+    "slope": "float64",
+    "aspect": "float64",
+    "TWI": "float64",
+    "SPI": "float64",
+    "rain_1d_mm": "float64",
+    "station_count": "int64",
+    "interpolation_method": "str",
+    "distance_to_river_km": "float64",
+    "distance_to_road_km": "float64",
+    "ndvi": "float64",
+    "land_cover_class": "float64",
+    "flood_label": "int64",
+    "landslide_label_daily": "int64",
+    "landslide_label_static": "int64",
+    "population_2011": "float64",
+    "households_2011": "float64",
+    "literacy_rate_2011": "float64",
+    "work_participation_rate_2011": "float64"
+  },
+  "missing": {
+    "cell_id": 0,
+    "date": 0,
+    "latitude": 0,
+    "longitude": 0,
+    "soil_type_code": 0,
+    "soil_type": 0,
+    "elevation": 0,
+    "slope": 0,
+    "aspect": 0,
+    "TWI": 0,
+    "SPI": 0,
+    "rain_1d_mm": 0,
+    "station_count": 0,
+    "interpolation_method": 0,
+    "distance_to_river_km": 0,
+    "distance_to_road_km": 0,
+    "ndvi": 66352,
+    "land_cover_class": 3016,
+    "flood_label": 0,
+    "landslide_label_daily": 0,
+    "landslide_label_static": 0,
+    "population_2011": 496132,
+    "households_2011": 496132,
+    "literacy_rate_2011": 496132,
+    "work_participation_rate_2011": 496132
+  },
+  "missing_percentage": {
+    "cell_id": 0.0,
+    "date": 0.0,
+    "latitude": 0.0,
+    "longitude": 0.0,
+    "soil_type_code": 0.0,
+    "soil_type": 0.0,
+    "elevation": 0.0,
+    "slope": 0.0,
+    "aspect": 0.0,
+    "TWI": 0.0,
+    "SPI": 0.0,
+    "rain_1d_mm": 0.0,
+    "station_count": 0.0,
+    "interpolation_method": 0.0,
+    "distance_to_river_km": 0.0,
+    "distance_to_road_km": 0.0,
+    "ndvi": 12.6984,
+    "land_cover_class": 0.5772,
+    "flood_label": 0.0,
+    "landslide_label_daily": 0.0,
+    "landslide_label_static": 0.0,
+    "population_2011": 94.9495,
+    "households_2011": 94.9495,
+    "literacy_rate_2011": 94.9495,
+    "work_participation_rate_2011": 94.9495
+  },
+  "duplicate_rows": 0,
+  "duplicate_cell_date_keys": 0,
+  "unique_cells": 693,
+  "date_range": {
+    "min": "2021-01-08",
+    "max": "2023-12-14"
+  },
+  "numerical_ranges": {
+    "latitude": {
+      "min": 25.3,
+      "max": 26.9
+    },
+    "longitude": {
+      "min": 89.8,
+      "max": 94.3
+    },
+    "soil_type_code": {
+      "min": 0,
+      "max": 29
+    },
+    "elevation": {
+      "min": 25.17539024353028,
+      "max": 1759.2415771484375
+    },
+    "slope": {
+      "min": 0.4599275290966034,
+      "max": 26.16622734069824
+    },
+    "aspect": {
+      "min": 94.20901489257812,
+      "max": 241.00401306152344
+    },
+    "TWI": {
+      "min": 6.741220951080322,
+      "max": 11.15624713897705
+    },
+    "SPI": {
+      "min": 7.359274387359619,
+      "max": 55009.7265625
+    },
+    "rain_1d_mm": {
+      "min": 0.02,
+      "max": 398.649135111939
+    },
+    "station_count": {
+      "min": 1,
+      "max": 39
+    },
+    "distance_to_river_km": {
+      "min": 0.0001409158215249,
+      "max": 2.567194785157382
+    },
+    "distance_to_road_km": {
+      "min": 0.0003516431445881,
+      "max": 12.875121970280947
+    },
+    "ndvi": {
+      "min": 0.013454477534398,
+      "max": 0.770651309224
+    },
+    "land_cover_class": {
+      "min": 1.0,
+      "max": 7.0
+    },
+    "flood_label": {
+      "min": 0,
+      "max": 1
+    },
+    "landslide_label_daily": {
+      "min": 0,
+      "max": 1
+    },
+    "landslide_label_static": {
+      "min": 0,
+      "max": 1
+    },
+    "population_2011": {
+      "min": 395124.0,
+      "max": 2823768.0
+    },
+    "households_2011": {
+      "min": 66028.0,
+      "max": 559340.0
+    },
+    "literacy_rate_2011": {
+      "min": 47.32,
+      "max": 79.84
+    },
+    "work_participation_rate_2011": {
+      "min": 33.17,
+      "max": 45.65
+    }
+  },
+  "categorical_cardinality": {
+    "cell_id": 693,
+    "date": 754,
+    "soil_type": 8,
+    "interpolation_method": 2
+  },
+  "targets": {
+    "flood_label": {
+      "0": 522211,
+      "1": 311
+    },
+    "landslide_label_daily": {
+      "0": 522516,
+      "1": 6
+    },
+    "landslide_label_static": {
+      "0": 376246,
+      "1": 146276
+    }
+  },
+  "spatial_coverage": {
+    "latitude": {
+      "min": 25.3,
+      "max": 26.9,
+      "unique": 17
+    },
+    "longitude": {
+      "min": 89.8,
+      "max": 94.3,
+      "unique": 46
+    }
+  },
+  "temporal_coverage": {
+    "unique_dates": 754,
+    "rows_per_date_min": 693,
+    "rows_per_date_max": 693
+  }
+}
